@@ -108,10 +108,10 @@ let loginService = async (userData) => {
     }
 }
 
-let forgotPasswordService = async (email, telephone, dateOfBirth) => {
+let forgotPasswordService = async (email) => {
 
     try {
-        const user = await userModel.findOne({ email: email }, { telephone }, { dateOfBirth }).populate("profile");
+        const user = await userModel.findOne({ email: email }).populate("profile");
         console.log(user)
         if (!user) {
             return Promise.reject(
@@ -119,17 +119,17 @@ let forgotPasswordService = async (email, telephone, dateOfBirth) => {
             )
         }
         else {
-            const password = random(10)
-            console.log(password)
 
-            user.password = password;
-            await user.save();
+            const resetToken = user.createPasswordResetToken();
+            await user.save({ validateBeforeSave: false });
+
+            let link = `${process.env.WEB_URL}/auth/user/forgot/password/${resetToken}`
 
             let firstName = user.profile.user.firstName.charAt(0).toUpperCase() + user.profile.user.firstName.slice(1)
 
             const htmlString = `
-            <strong> ${firstName} you have just requested to change your password</strong>\n
-            <p> here is your password ${password}</p> \n
+            <strong> Hi ${firstName}, click the link below to change your password.</strong>\n
+            <a href=${link}> ${link}> </a>\n
 
              <p> If you didn't request for a password change,\n 
               your account might be compromised, contact the admin.
@@ -140,15 +140,19 @@ let forgotPasswordService = async (email, telephone, dateOfBirth) => {
             await sendMail({
                 from: process.env.EMAIL_USER,
                 to: email,
-                subject: "Weaverbuxx, Password has been changed ",
+                subject: "Ultravest, Password change requested ",
                 html: htmlString,
             });
-            return Promise.resolve("Please check your email to see your new password")
+            return Promise.resolve("Please check your email for further instructions")
 
         }
     }
     catch (err) {
         console.log(err)
+        user.createPasswordResetToken = undefined;
+        user.createPasswordResetExpires = undefined;
+        await user.save({ validateBeforeSave: false });
+
         return Promise.reject({
             err
         })
@@ -163,21 +167,34 @@ let resetPasswordService = async (password, email) => {
     if (user === null || !(await user.comparePassword(password, user.password))) {
         return Promise.reject('Incorrect  password')
     }
-    // const newPassword = random(4)
-    // user.password = newPassword;
+
+    user.password = password;
     await user.save()
-
-    // const message = `Your password was resetted , here is your password ${newPassword}. \nIf you didn't request a reset, please contact the admin.`;
-    // const html = `<strong>Your password was resetted, here is your password ${newPassword}. \n <br /> If you didn't request a reset, please contact the admin.</strong>`;
-
-    // //email sent here
-    // await sendEmail({
-    //     email,
-    //     subject: " Crebb, Here is Your Password after Reset",
-    //     html,
-    //     message,
-    // });
-    return Promise.resolve("Please check your email to see your password, use the password to login")
+    return Promise.resolve("Password changed successfully")
 }
 
-module.exports = { loginService, registerService, forgotPasswordService, resetPasswordService }
+
+
+let changePasswordService = async (resetToken, password) => {
+    // 2) Check if user exist and token has not expired
+    const user = await userModel.findOne({ passwordResetToken: resetToken, passwordResetExpires: { $gt: Date.now() } });
+
+    if (user) {
+        user.password = password;
+        await user.save();
+        return Promise.resolve("Password changed successfully")
+    }
+    else {
+        return Promise.reject("No user found")
+    }
+
+
+}
+
+module.exports = {
+    loginService,
+    registerService,
+    forgotPasswordService,
+    resetPasswordService,
+    changePasswordService
+}

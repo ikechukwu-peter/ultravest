@@ -33,7 +33,9 @@ const schema = Schema({
     },
     verificationToken: String,
     verificationTokenExpires: Date,
-    passwordChangedAt: Date
+    passwordChangedAt: Date,
+    passwordResetToken: String,
+    passwordResetExpires: Date,
 },
     {
         toJSON: { virtuals: true },
@@ -74,11 +76,33 @@ schema.methods.comparePassword = async function (
     return await bcrypt.compare(candidatePassword, userPassword);
 };
 
-// schema.pre(/^find/, function (next) {
-//     // this points to the current query
-//     this.find({ active: { $ne: false } });
-//     next();
-// });
+schema.methods.changedPasswordAfter = function (JWTTimestamp) {
+    if (this.passwordChangedAt) {
+      const changedTimestamp = parseInt(
+        this.passwordChangedAt.getTime() / 1000,
+        10
+      );
+  
+      return JWTTimestamp < changedTimestamp;
+    }
+  
+    // False means NOT changed
+    return false;
+  };
+  
+  //This creates random strings, the encrypted version is stored in the db while the plain is sent to the db
+  schema.methods.createPasswordResetToken = function () {
+    const resetToken = crypto.randomBytes(32).toString("hex");
+  
+    this.passwordResetToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+  
+    this.passwordResetExpires = Date.now() + 2 * (10 * 60 * 1000);
+  
+    return resetToken;
+  };
 
 // 3. Create a Model.
 const UserModel = model('User', schema);
