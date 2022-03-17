@@ -10,7 +10,7 @@ cron.schedule("59 59 0 * * *", async function () {
     let percentage = 100;
 
     try {
-        let users = await UserModel.find({ "depositeDate": { $gte: +twoMonths } }).populate('profile').exec();
+        let users = await UserModel.find({ "depositDate": { $gte: +twoMonths } }).populate('profile').exec();
         if (users.length > 0) {
             users.map((user) => {
                 const interest = (user.profile.accountType.returnOfInvestment.split('%')[0] / percentage) * user.profile.investment.walletBalance;
@@ -22,7 +22,7 @@ cron.schedule("59 59 0 * * *", async function () {
         console.log("ERROR OCCURRED WHILE RUNNING WORKER TO UPDATE INTEREST")
         console.log(error);
         console.log("TRYING TO UPDATE INTEREST AGAIN")
-        let users = await UserModel.find({ "depositeDate": { $gte: +twoMonths } }).populate('profile').exec();
+        let users = await UserModel.find({ "depositDate": { $gte: +twoMonths } }).populate('profile').exec();
         if (users.length > 0) {
             users.map((user) => {
                 const interest = (user.profile.accountType.returnOfInvestment.split('%')[0] / percentage) * user.profile.investment.walletBalance;
